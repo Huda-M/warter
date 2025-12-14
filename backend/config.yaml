@@ -1,0 +1,38 @@
+simulation:
+  update_interval: 1.0
+  physics_accuracy: medium
+  leak_probability: 0.001
+  auto_start: true
+
+tank:
+  max_capacity: 1000
+  min_capacity: 0
+  initial_level: 60
+  diameter: 1.5
+  height: 2.0
+  material: steel
+
+ai:
+  decision_interval: 2.0
+  tolerance: 1.0
+  prediction_horizon: 10
+  learning_enabled: true
+
+api:
+  host: 0.0.0.0
+  port: 5000
+  debug: true
+  cors_origins:
+    - http://localhost:3000
+    - http://127.0.0.1:3000
+
+logging:
+  level: INFO
+  file: logs/digital_twin.log
+  max_size_mb: 10
+  backup_count: 5
+
+database:
+  path: data/historical_data.db
+  cleanup_days: 30
+  backup_enabled: true

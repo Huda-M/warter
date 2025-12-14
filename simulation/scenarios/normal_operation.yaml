@@ -1,0 +1,23 @@
+name: التشغيل الطبيعي
+description: سيناريو التشغيل العادي للخزان مع تقلبات طبيعية في الطلب
+duration: 300  # ثانية
+
+parameters:
+  initial_level: 60
+  target_level: 80
+  flow_rate: 20
+  temperature_range: [18, 30]
+  demand_pattern: normal
+
+events:
+  - time: 30
+    action: increase_demand
+    value: 30
+    
+  - time: 120
+    action: decrease_demand
+    value: 10
+    
+  - time: 200
+    action: temperature_change
+    value: 25

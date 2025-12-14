@@ -1,0 +1,21 @@
+name: سيناريو التسرب
+description: محاكاة حالة تسرب مياه في الخزان
+duration: 180
+
+parameters:
+  initial_level: 80
+  leak_start_time: 30
+  leak_rate: 5  # لتر/دقيقة
+  alert_threshold: 70
+
+events:
+  - time: 30
+    action: activate_leak
+    severity: medium
+    
+  - time: 60
+    action: increase_leak
+    severity: high
+    
+  - time: 120
+    action: emergency_shutdown
