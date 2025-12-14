@@ -1,10 +1,14 @@
 import os
 import sys
 import logging
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request  
 from flask_cors import CORS
 from flask_socketio import SocketIO
-import eventlet
+import gevent
+from gevent import monkey
+from gevent.pywsgi import WSGIServer
+from geventwebsocket.handler import WebSocketHandler
+monkey.patch_all()
 
 # إعداد التسجيل
 logging.basicConfig(level=logging.INFO)
@@ -13,25 +17,35 @@ logger = logging.getLogger(__name__)
 # إعداد Flask و SocketIO
 app = Flask(__name__)
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
-
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 # استيراد Blueprints من api
+# استيراد النماذج والأدوات
+try:
+    # Models
+    from models.tank_model import WaterTank
+    from models.ai_decision import AIDecisionMaker
+    from utils.data_logger import DataLogger
+    from utils.alert_system import AlertSystem
+    
+    logger.info("Models imported successfully")
+except ImportError as e:
+    logger.error(f"Error importing models: {e}")
+    sys.exit(1)
+
+# استيراد Blueprints بعد النماذج
 try:
     from api.tank_api import tank_bp
     from api.control_api import control_bp
     from api.simulation_api import simulation_bp
-    app.register_blueprint(tank_bp)
-    app.register_blueprint(control_bp)
-    app.register_blueprint(simulation_bp)
+    
+    app.register_blueprint(tank_bp, url_prefix='/api')
+    app.register_blueprint(control_bp, url_prefix='/api')
+    app.register_blueprint(simulation_bp, url_prefix='/api')
+    
+    logger.info("Blueprints registered successfully")
 except ImportError as e:
     logger.error(f"Error importing Blueprints: {e}")
     sys.exit(1)
-
-# استيراد النماذج
-from models.tank_model import WaterTank
-from models.ai_decision import AIDecisionMaker
-from utils.data_logger import DataLogger
-from utils.alert_system import AlertSystem
 
 # إنشاء مثيلات عالمية
 tank_model = WaterTank()
@@ -272,4 +286,8 @@ if __name__ == '__main__':
     sim_thread.start()
     
     # تشغيل الخادم
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+    
+
+    server = WSGIServer(('0.0.0.0', 5000), app, handler_class=WebSocketHandler)
+    print("Server running on http://0.0.0.0:5000")
+    server.serve_forever()

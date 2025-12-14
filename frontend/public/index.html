@@ -1,33 +1,401 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar" dir="rtl">
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#1e40af" />
     <meta
       name="description"
-      content="Water Tank Digital Twin Simulator - A Python and React based digital twin for water tank management"
+      content="التوأم الرقمي - محاكاة وإدارة خزان المياه الذكي باستخدام الذكاء الاصطناعي"
     />
-    <title>Water Tank Digital Twin</title>
-    <!-- يمكن إضافة خطوط Google Fonts إذا رغبت -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <meta name="keywords" content="خزان مياه, توأم رقمي, محاكاة, ذكاء اصطناعي, تحكم آلي" />
+    <meta name="author" content="Water Tank Digital Twin System" />
+    
+    <!-- Open Graph Meta Tags for Social Sharing -->
+    <meta property="og:title" content="التوأم الرقمي - خزان المياه الذكي" />
+    <meta property="og:description" content="نظام محاكاة متكامل لإدارة خزانات المياه باستخدام التوأم الرقمي والذكاء الاصطناعي" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="%PUBLIC_URL%/og-image.png" />
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="التوأم الرقمي - خزان المياه الذكي" />
+    <meta name="twitter:description" content="محاكاة ذكية لحالة خزان المياه في الوقت الفعلي" />
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    
+    <!-- Font Awesome Icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+    
+    <!-- Splash Screen Styles for PWA -->
     <style>
-      /* يمكن إضافة أنماط عامة هنا */
+      /* Loading screen styles */
+      .app-loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        transition: opacity 0.5s ease-out;
+      }
+      
+      .app-loading.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      
+      .loading-logo {
+        width: 120px;
+        height: 120px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 24px;
+        animation: pulse 2s infinite;
+      }
+      
+      .loading-logo i {
+        font-size: 48px;
+        color: white;
+      }
+      
+      .loading-text {
+        color: white;
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 16px;
+        font-family: 'Cairo', sans-serif;
+      }
+      
+      .loading-subtext {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 16px;
+        margin-bottom: 32px;
+        font-family: 'Cairo', sans-serif;
+      }
+      
+      .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s linear infinite;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      
+      @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+      }
+      
+      /* Global styles that will apply to the entire app */
+      * {
+        box-sizing: border-box;
+      }
+      
       body {
-        font-family: 'Inter', sans-serif;
+        margin: 0;
+        padding: 0;
+        font-family: 'Cairo', 'Segoe UI', 'Roboto', 'Oxygen',
+          'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        background-color: #f0f9ff;
+        color: #1e293b;
+        overflow-x: hidden;
+      }
+      
+      /* Custom scrollbar */
+      ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+      
+      ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 5px;
+      }
+      
+      ::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 5px;
+      }
+      
+      ::-webkit-scrollbar-thumb:hover {
+        background: #555;
+      }
+      
+      /* Selection color */
+      ::selection {
+        background-color: #3b82f6;
+        color: white;
+      }
+      
+      /* Print styles */
+      @media print {
+        body {
+          background-color: white;
+          color: black;
+        }
+        
+        .no-print {
+          display: none !important;
+        }
+      }
+      
+      /* Accessibility: focus styles */
+      :focus {
+        outline: 2px solid #3b82f6;
+        outline-offset: 2px;
+      }
+      
+      :focus:not(:focus-visible) {
+        outline: none;
+      }
+      
+      /* Reduced motion preferences */
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+      
+      /* Dark mode preference */
+      @media (prefers-color-scheme: dark) {
+        body {
+          background-color: #0f172a;
+          color: #f1f5f9;
+        }
+        
+        ::-webkit-scrollbar-track {
+          background: #1e293b;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+          background: #475569;
+        }
       }
     </style>
+    
+    <title>التوأم الرقمي - خزان المياه الذكي</title>
+    
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/apple-touch-icon.png" />
+    
+    <!-- Microsoft Tile Color -->
+    <meta name="msapplication-TileColor" content="#1e40af" />
   </head>
   <body>
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="app-loading">
+      <div class="loading-logo">
+        <i class="fas fa-tint"></i>
+      </div>
+      <div class="loading-text">التوأم الرقمي - خزان المياه</div>
+      <div class="loading-subtext">جاري تحميل النظام...</div>
+      <div class="loading-spinner"></div>
+    </div>
+    
+    <!-- Root element where React will mount -->
+    <div id="root"></div>
+    
+    <!-- No Script Fallback -->
     <noscript>
-      <div style="text-align: center; padding: 50px;">
-        <h1>JavaScript is required to run this application.</h1>
-        <p>Please enable JavaScript in your browser settings and refresh the page.</p>
+      <div style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        text-align: center;
+        padding: 20px;
+        font-family: 'Cairo', sans-serif;
+        z-index: 10000;
+      ">
+        <div style="
+          background: rgba(255, 255, 255, 0.1);
+          padding: 40px;
+          border-radius: 20px;
+          backdrop-filter: blur(10px);
+          max-width: 600px;
+        ">
+          <i class="fas fa-exclamation-triangle" style="font-size: 64px; margin-bottom: 20px;"></i>
+          <h1 style="font-size: 28px; margin-bottom: 16px;">JavaScript مطلوب</h1>
+          <p style="font-size: 18px; line-height: 1.6; margin-bottom: 24px;">
+            يعتمد هذا التطبيق على JavaScript للعمل بشكل صحيح. يرجى تمكين JavaScript في متصفحك وتحديث الصفحة.
+          </p>
+          <p style="font-size: 16px; opacity: 0.8; margin-bottom: 32px;">
+            هذا النظام يستخدم تقنيات حديثة للمحاكاة والتحكم في خزان المياه، ويتطلب تفعيل JavaScript لعرض الواجهة التفاعلية.
+          </p>
+          <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+            <button onclick="location.reload()" style="
+              background: white;
+              color: #1e3c72;
+              border: none;
+              padding: 12px 24px;
+              border-radius: 8px;
+              font-size: 16px;
+              font-weight: 600;
+              cursor: pointer;
+              transition: all 0.3s;
+            " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.2)';"
+            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+              <i class="fas fa-redo"></i> تحديث الصفحة
+            </button>
+            <button onclick="window.history.back()" style="
+              background: rgba(255, 255, 255, 0.1);
+              color: white;
+              border: 2px solid white;
+              padding: 12px 24px;
+              border-radius: 8px;
+              font-size: 16px;
+              font-weight: 600;
+              cursor: pointer;
+              transition: all 0.3s;
+            " onmouseover="this.style.background='rgba(255,255,255,0.2)';"
+            onmouseout="this.style.background='rgba(255,255,255,0.1)';">
+              <i class="fas fa-arrow-right"></i> العودة للخلف
+            </button>
+          </div>
+        </div>
+        <div style="margin-top: 40px; font-size: 14px; opacity: 0.6;">
+          <p>Water Tank Digital Twin System v1.0.0</p>
+        </div>
       </div>
     </noscript>
-    <div id="root"></div>
+    
+    <!-- Service Worker Registration Script -->
+    <script>
+      // Hide loading screen when page is loaded
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          var loadingScreen = document.getElementById('loading-screen');
+          if (loadingScreen) {
+            loadingScreen.classList.add('hidden');
+            setTimeout(function() {
+              loadingScreen.style.display = 'none';
+            }, 500);
+          }
+        }, 1000);
+      });
+      
+      // Register service worker for PWA
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('%PUBLIC_URL%/service-worker.js')
+            .then(function(registration) {
+              console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            })
+            .catch(function(error) {
+              console.log('ServiceWorker registration failed: ', error);
+            });
+        });
+      }
+      
+      // Add to Home Screen functionality
+      let deferredPrompt;
+      const installButton = document.getElementById('install-button');
+      
+      window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent Chrome 67 and earlier from automatically showing the prompt
+        e.preventDefault();
+        // Stash the event so it can be triggered later
+        deferredPrompt = e;
+        // Show install button if it exists
+        if (installButton) {
+          installButton.style.display = 'block';
+        }
+      });
+      
+      // Function to trigger install prompt
+      function installApp() {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          deferredPrompt.userChoice.then((choiceResult) => {
+            if (choiceResult.outcome === 'accepted') {
+              console.log('User accepted the install prompt');
+            } else {
+              console.log('User dismissed the install prompt');
+            }
+            deferredPrompt = null;
+          });
+        }
+      }
+      
+      // Detect if app is running as PWA
+      window.addEventListener('DOMContentLoaded', () => {
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+          console.log('Running as PWA');
+          document.body.classList.add('pwa-mode');
+        }
+      });
+      
+      // Handle offline/online status
+      window.addEventListener('online', function() {
+        console.log('Online');
+        if (typeof window.showOnlineMessage === 'function') {
+          window.showOnlineMessage();
+        }
+      });
+      
+      window.addEventListener('offline', function() {
+        console.log('Offline');
+        if (typeof window.showOfflineMessage === 'function') {
+          window.showOfflineMessage();
+        }
+      });
+      
+      // Error boundary fallback
+      window.addEventListener('error', function(event) {
+        console.error('Global error caught:', event.error);
+        // You could send this to an error tracking service
+      });
+    </script>
+    
+    <!-- Analytics Script (Optional) -->
+    <!--
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-XXXXXXX-X"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'UA-XXXXXXX-X');
+    </script>
+    -->
   </body>
 </html>

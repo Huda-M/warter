@@ -102,3 +102,15 @@ class AlertSystem:
         except Exception as e:
             logger.error(f"Error acknowledging alert {alert_id}: {e}")
             return False
+    
+    # ❌ المشكلة: دالة clear_all_alerts() غير موجودة
+    def clear_all_alerts(self):
+        conn = sqlite3.connect(self.data_logger.db_path)
+        cursor = conn.cursor()
+    
+        cursor.execute('UPDATE alerts SET resolved = TRUE')
+    
+        conn.commit()
+        conn.close()
+    
+        logger.info("All alerts cleared")

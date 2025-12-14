@@ -1,7 +1,13 @@
 from flask import Blueprint, jsonify, request
-from ..models.tank_model import WaterTank
-from ..models.ai_decision import AIDecisionMaker
-from ..utils.data_logger import DataLogger
+
+import sys
+from pathlib import Path
+# إضافة المسار الأب للملف الحالي
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from models.tank_model import WaterTank
+from models.ai_decision import AIDecisionMaker
+from utils.data_logger import DataLogger
 
 tank_bp = Blueprint('tank', __name__)
 

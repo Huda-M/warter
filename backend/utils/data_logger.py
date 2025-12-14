@@ -187,3 +187,47 @@ class DataLogger:
         
         conn.commit()
         conn.close()
+    
+    def get_alerts(self, unresolved_only=True, limit=50, severity=None):
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+    
+        query = "SELECT * FROM alerts"
+        params = []
+        conditions = []
+    
+        if unresolved_only:
+            conditions.append("resolved = FALSE")
+    
+        if severity:
+            conditions.append("severity = ?")
+            params.append(severity)
+    
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+    
+        query += " ORDER BY timestamp DESC LIMIT ?"
+        params.append(limit)
+    
+        cursor.execute(query, params)
+        columns = [col[0] for col in cursor.description]
+        data = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    
+        conn.close()
+        return data
+    
+    def log_ai_message(self, message, log_type="info", details=None):
+    
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+    
+    # تحويل details لـ JSON إذا كان موجوداً
+        details_json = json.dumps(details) if details else None
+    
+        cursor.execute('''
+            INSERT INTO ai_logs (message, log_type)
+            VALUES (?, ?)
+            ''', (message, log_type))
+    
+        conn.commit()
+        conn.close()

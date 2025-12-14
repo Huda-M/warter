@@ -38,6 +38,7 @@ class WaterTank:
         # سجلات
         self.history = []
         self.last_update = datetime.now()
+        self.ai_mode = True
         
     def _level_to_volume(self, level: float) -> float:
         """تحويل المستوى النسبي إلى حجم مطلق"""
@@ -164,3 +165,5 @@ class WaterTank:
     def get_history(self, limit: int = 100) -> list:
         """الحصول على التاريخ"""
         return self.history[-limit:] if self.history else []
+    
+    
