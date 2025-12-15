@@ -45,8 +45,6 @@ class DataLogger:
                 details TEXT
             )
         ''')
-        cursor.execute("ALTER TABLE ai_logs ADD COLUMN details TEXT;")
-        conn.commit()
 
 
         # جدول التنبيهات
