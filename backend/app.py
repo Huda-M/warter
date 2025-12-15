@@ -8,6 +8,7 @@ import gevent
 from gevent import monkey
 from gevent.pywsgi import WSGIServer
 from geventwebsocket.handler import WebSocketHandler
+import time
 
 # ⚠️ IMPORTANT: monkey.patch_all() يجب أن يكون قبل أي استيراد آخر
 monkey.patch_all()
@@ -33,61 +34,20 @@ except ImportError as e:
     logger.error(f"❌ Error importing models: {e}")
     sys.exit(1)
 
-# استيراد Blueprints
-try:
-    from api.tank_api import tank_bp
-    from api.control_api import control_bp
-    from api.simulation_api import simulation_bp
-    
-    app.register_blueprint(tank_bp, url_prefix='/api')
-    app.register_blueprint(control_bp, url_prefix='/api')
-    app.register_blueprint(simulation_bp, url_prefix='/api')
-    
-    logger.info("✅ Blueprints registered successfully")
-except ImportError as e:
-    logger.error(f"❌ Error importing Blueprints: {e}")
-    sys.exit(1)
-
-# استيراد محلل الاستهلاك
-try:
-    from utils.consumption_analyzer import ConsumptionAnalyzer, create_consumption_endpoint
-    logger.info("✅ Consumption Analyzer imported successfully")
-except ImportError as e:
-    logger.warning(f"⚠️ Consumption Analyzer not found: {e}")
-    ConsumptionAnalyzer = None
-    create_consumption_endpoint = None
-
 # إنشاء مثيلات عالمية
 tank_model = WaterTank()
 ai_system = AIDecisionMaker()
 data_logger = DataLogger()
 alert_system = AlertSystem(data_logger)
 
-# إنشاء محلل الاستهلاك إذا كان متاحاً
-if ConsumptionAnalyzer:
-    consumption_analyzer = ConsumptionAnalyzer()
-    create_consumption_endpoint(app, consumption_analyzer)
-    logger.info("✅ Consumption analysis endpoints registered")
-
 # حالة المحاكاة
 simulation_running = False
+
+# ==================== الصفحة الرئيسية ====================
 
 @app.route('/')
 def index():
     """الصفحة الرئيسية للـ API"""
-    endpoints = {
-        'tank': '/api/tank/state',
-        'control': '/api/control/fill',
-        'simulation': '/api/simulation/scenarios',
-        'alerts': '/api/alerts',
-        'system_stats': '/api/system/stats'
-    }
-    
-    # إضافة endpoints التحليل إذا كانت متاحة
-    if ConsumptionAnalyzer:
-        endpoints['consumption_analysis'] = '/api/analysis/consumption'
-        endpoints['consumption_report'] = '/api/analysis/report'
-    
     return jsonify({
         'name': 'Water Tank Digital Twin API',
         'version': '1.0.0',
@@ -101,15 +61,303 @@ def index():
             'Alert system',
             'WebSocket support'
         ],
-        'endpoints': endpoints,
+        'endpoints': {
+            'tank_state': '/api/tank/state',
+            'tank_history': '/api/tank/history',
+            'control_fill': '/api/control/fill',
+            'control_drain': '/api/control/drain',
+            'control_stop': '/api/control/stop',
+            'alerts': '/api/alerts',
+            'system_stats': '/api/system/stats',
+            'consumption_analysis': '/api/analysis/consumption',
+            'consumption_report': '/api/analysis/report',
+            'simulation_start': '/api/simulation/start',
+            'simulation_stop': '/api/simulation/stop'
+        },
         'websocket': 'ws://localhost:5000'
     })
+
+# ==================== Tank Endpoints ====================
+
+@app.route('/api/tank/state', methods=['GET'])
+def get_tank_state():
+    """الحصول على حالة الخزان الحالية"""
+    try:
+        state = tank_model.get_state()
+        return jsonify({
+            'success': True,
+            'data': state
+        })
+    except Exception as e:
+        logger.error(f"Error getting tank state: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/tank/history', methods=['GET'])
+def get_tank_history():
+    """الحصول على تاريخ قراءات الخزان"""
+    try:
+        limit = request.args.get('limit', default=100, type=int)
+        history = tank_model.get_history(limit)
+        return jsonify({
+            'success': True,
+            'data': history,
+            'count': len(history)
+        })
+    except Exception as e:
+        logger.error(f"Error getting tank history: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/tank/update', methods=['POST'])
+def update_tank():
+    """تحديث حالة الخزان (محاكاة مرور الوقت)"""
+    try:
+        data = request.json or {}
+        dt = data.get('dt', 1.0)
+        
+        # تحديث الفيزياء
+        tank_model.update_physics(dt)
+        
+        # تسجيل البيانات
+        data_logger.log_tank_data(tank_model.get_state())
+        
+        return jsonify({
+            'success': True,
+            'state': tank_model.get_state()
+        })
+    except Exception as e:
+        logger.error(f"Error updating tank: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# ==================== Control Endpoints ====================
+
+@app.route('/api/control/fill', methods=['POST'])
+def start_filling():
+    """بدء عملية ملء الخزان"""
+    try:
+        tank_model.set_fill(True)
+        data_logger.log_ai_message("💧 بدء الملء (يدوي)", "info")
+        return jsonify({
+            'success': True,
+            'is_filling': True,
+            'message': 'Filling started'
+        })
+    except Exception as e:
+        logger.error(f"Error starting fill: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/control/drain', methods=['POST'])
+def start_draining():
+    """بدء عملية تفريغ الخزان"""
+    try:
+        tank_model.set_drain(True)
+        data_logger.log_ai_message("📉 بدء التفريغ (يدوي)", "info")
+        return jsonify({
+            'success': True,
+            'is_draining': True,
+            'message': 'Draining started'
+        })
+    except Exception as e:
+        logger.error(f"Error starting drain: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/control/stop', methods=['POST'])
+def stop_all():
+    """إيقاف جميع العمليات"""
+    try:
+        tank_model.set_fill(False)
+        tank_model.set_drain(False)
+        data_logger.log_ai_message("⏹ إيقاف العمليات", "info")
+        return jsonify({
+            'success': True,
+            'is_filling': False,
+            'is_draining': False,
+            'message': 'All operations stopped'
+        })
+    except Exception as e:
+        logger.error(f"Error stopping operations: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/control/flow_rate', methods=['POST'])
+def set_flow_rate():
+    """تعيين معدل التدفق"""
+    try:
+        data = request.json or {}
+        rate = data.get('rate', 20)
+        tank_model.set_flow_rate(rate)
+        return jsonify({
+            'success': True,
+            'flow_rate': tank_model.flow_rate
+        })
+    except Exception as e:
+        logger.error(f"Error setting flow rate: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/control/target', methods=['POST'])
+def set_target_level():
+    """تعيين مستوى الهدف"""
+    try:
+        data = request.json or {}
+        target = data.get('target', 80)
+        ai_system.config.target_level = target
+        return jsonify({
+            'success': True,
+            'target_level': ai_system.config.target_level
+        })
+    except Exception as e:
+        logger.error(f"Error setting target level: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/control/ai/decision', methods=['GET'])
+def get_ai_decision():
+    """الحصول على قرار الذكاء الاصطناعي"""
+    try:
+        state = tank_model.get_state()
+        history = tank_model.get_history(20)
+        action, message, details = ai_system.analyze(state, history)
+        return jsonify({
+            'success': True,
+            'action': action.value,
+            'message': message,
+            'details': details
+        })
+    except Exception as e:
+        logger.error(f"Error getting AI decision: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# ==================== Consumption Analysis ====================
+
+@app.route('/api/analysis/consumption', methods=['GET'])
+def get_consumption_analysis():
+    """تحليل أنماط الاستهلاك"""
+    try:
+        from utils.consumption_analyzer import ConsumptionAnalyzer
+        
+        days = request.args.get('days', default=7, type=int)
+        analyzer = ConsumptionAnalyzer()
+        analysis = analyzer.analyze_consumption_patterns(days)
+        
+        return jsonify({
+            'success': True,
+            'data': analysis
+        })
+    except Exception as e:
+        logger.error(f"Error analyzing consumption: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': 'تأكد من وجود بيانات كافية في قاعدة البيانات'
+        }), 500
+
+@app.route('/api/analysis/report', methods=['GET'])
+def get_consumption_report():
+    """توليد تقرير استهلاك نصي"""
+    try:
+        from utils.consumption_analyzer import ConsumptionAnalyzer
+        from flask import Response
+        
+        days = request.args.get('days', default=7, type=int)
+        analyzer = ConsumptionAnalyzer()
+        report = analyzer.generate_report(days)
+        
+        return Response(
+            report,
+            mimetype='text/plain',
+            headers={
+                'Content-Disposition': f'attachment; filename=consumption_report_{days}d.txt'
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error generating report: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# ==================== System Stats ====================
 
 @app.route('/api/system/stats', methods=['GET'])
 def system_stats():
     """إحصائيات النظام"""
     try:
-        stats = data_logger.get_system_stats()
+        # استخدام DataLogger للحصول على الإحصائيات
+        import sqlite3
+        from datetime import datetime, timedelta
+        
+        conn = sqlite3.connect(data_logger.db_path)
+        cursor = conn.cursor()
+        
+        # عدد القراءات
+        cursor.execute('SELECT COUNT(*) FROM tank_readings')
+        total_readings = cursor.fetchone()[0]
+        
+        # آخر قراءة
+        cursor.execute('SELECT timestamp FROM tank_readings ORDER BY timestamp DESC LIMIT 1')
+        last_reading_row = cursor.fetchone()
+        last_reading = last_reading_row[0] if last_reading_row else None
+        
+        # أول قراءة
+        cursor.execute('SELECT timestamp FROM tank_readings ORDER BY timestamp ASC LIMIT 1')
+        first_reading_row = cursor.fetchone()
+        first_reading = first_reading_row[0] if first_reading_row else None
+        
+        # متوسط مستوى المياه في آخر 24 ساعة
+        yesterday = (datetime.now() - timedelta(hours=24)).isoformat()
+        cursor.execute('''
+            SELECT AVG(water_level) 
+            FROM tank_readings 
+            WHERE timestamp >= ?
+        ''', (yesterday,))
+        avg_level_row = cursor.fetchone()
+        avg_water_level_24h = avg_level_row[0] if avg_level_row[0] else 0
+        
+        # التنبيهات النشطة
+        cursor.execute('SELECT COUNT(*) FROM alerts WHERE resolved = FALSE')
+        active_alerts = cursor.fetchone()[0]
+        
+        # سجلات الذكاء الاصطناعي
+        cursor.execute('SELECT COUNT(*) FROM ai_logs')
+        ai_logs_count = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        stats = {
+            'tank_readings_count': total_readings,
+            'first_reading': first_reading,
+            'last_reading': last_reading,
+            'active_alerts': active_alerts,
+            'ai_logs_count': ai_logs_count,
+            'avg_water_level_24h': round(avg_water_level_24h, 2) if avg_water_level_24h else 0,
+            'simulation_running': simulation_running,
+            'current_state': tank_model.get_state()
+        }
+        
         return jsonify({
             'success': True,
             'data': stats
@@ -120,6 +368,8 @@ def system_stats():
             'success': False,
             'error': str(e)
         }), 500
+
+# ==================== Alerts ====================
 
 @app.route('/api/alerts', methods=['GET'])
 def get_alerts():
@@ -132,7 +382,8 @@ def get_alerts():
         alerts = data_logger.get_alerts(unresolved_only, limit, severity)
         return jsonify({
             'success': True,
-            'data': alerts
+            'data': alerts,
+            'count': len(alerts)
         })
     except Exception as e:
         logger.error(f"Error getting alerts: {e}")
@@ -145,17 +396,11 @@ def get_alerts():
 def acknowledge_alert(alert_id):
     """التعرف على تنبيه"""
     try:
-        success = alert_system.acknowledge_alert(alert_id)
-        if success:
-            return jsonify({
-                'success': True,
-                'message': f'Alert {alert_id} acknowledged'
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'error': f'Alert {alert_id} not found'
-            }), 404
+        alert_system.acknowledge_alert(alert_id)
+        return jsonify({
+            'success': True,
+            'message': f'Alert {alert_id} acknowledged'
+        })
     except Exception as e:
         logger.error(f"Error acknowledging alert {alert_id}: {e}")
         return jsonify({
@@ -167,7 +412,13 @@ def acknowledge_alert(alert_id):
 def clear_alerts():
     """حذف جميع التنبيهات"""
     try:
-        alert_system.clear_all_alerts()
+        import sqlite3
+        conn = sqlite3.connect(data_logger.db_path)
+        cursor = conn.cursor()
+        cursor.execute('UPDATE alerts SET resolved = TRUE')
+        conn.commit()
+        conn.close()
+        
         return jsonify({
             'success': True,
             'message': 'All alerts cleared'
@@ -179,117 +430,64 @@ def clear_alerts():
             'error': str(e)
         }), 500
 
-# ==================== WebSocket Events ====================
+# ==================== Simulation ====================
 
-@socketio.on('connect')
-def handle_connect():
-    """عند اتصال عميل جديد"""
-    logger.info('🔌 Client connected')
-    socketio.emit('connected', {
-        'message': 'Connected to Water Tank Digital Twin',
-        'timestamp': gevent.time.time(),
-        'simulation_running': simulation_running
-    })
+@app.route('/api/simulation/start', methods=['POST'])
+def start_simulation():
+    """بدء المحاكاة"""
+    global simulation_running
     
-    # إرسال الحالة الأولية
-    state = tank_model.get_state()
-    socketio.emit('tank_update', state)
-
-@socketio.on('disconnect')
-def handle_disconnect():
-    """عند قطع اتصال عميل"""
-    logger.info('🔌 Client disconnected')
-
-@socketio.on('request_update')
-def handle_request_update(data):
-    """طلب تحديث البيانات"""
-    component = data.get('component', 'tank')
-    
-    try:
-        if component == 'tank':
-            state = tank_model.get_state()
-            socketio.emit('tank_update', state)
+    if not simulation_running:
+        simulation_running = True
         
-        elif component == 'alerts':
-            alerts = data_logger.get_alerts(unresolved_only=True, limit=10)
-            socketio.emit('alerts_update', alerts)
+        # بدء حلقة المحاكاة في thread منفصل
+        import threading
+        thread = threading.Thread(target=tank_simulation_loop, daemon=True)
+        thread.start()
         
-        elif component == 'ai_logs':
-            logs = ai_system.get_recent_logs(10)
-            socketio.emit('ai_logs_update', logs)
+        data_logger.log_ai_message("🚀 بدء محاكاة التوأم الرقمي", "system")
+        logger.info("✅ Simulation started")
         
-        elif component == 'all':
-            # إرسال كل البيانات
-            socketio.emit('tank_update', tank_model.get_state())
-            socketio.emit('alerts_update', data_logger.get_alerts(unresolved_only=True, limit=10))
-            socketio.emit('ai_logs_update', ai_system.get_recent_logs(10))
-            
-    except Exception as e:
-        logger.error(f"Error handling request_update: {e}")
-        socketio.emit('error', {'message': str(e)})
-
-@socketio.on('subscribe')
-def handle_subscribe(data):
-    """الاشتراك في قناة"""
-    channel = data.get('channel')
-    logger.info(f'📡 Client subscribed to {channel}')
-    socketio.emit('subscribed', {'channel': channel, 'success': True})
-
-@socketio.on('control_command')
-def handle_control_command(data):
-    """معالجة أوامر التحكم"""
-    command = data.get('command')
-    params = data.get('params', {})
-    
-    logger.info(f'🎮 Control command: {command} with params {params}')
-    
-    try:
-        # تنفيذ الأمر
-        if command == 'fill':
-            tank_model.set_fill(True)
-            data_logger.log_ai_message("💧 بدء الملء (عن طريق WebSocket)", "info")
-            
-        elif command == 'drain':
-            tank_model.set_drain(True)
-            data_logger.log_ai_message("📉 بدء التفريغ (عن طريق WebSocket)", "info")
-            
-        elif command == 'stop':
-            tank_model.set_fill(False)
-            tank_model.set_drain(False)
-            data_logger.log_ai_message("⏹ إيقاف العمليات (عن طريق WebSocket)", "info")
-        
-        elif command == 'set_target':
-            target = params.get('target', 80)
-            ai_system.config.target_level = target
-            data_logger.log_ai_message(f"🎯 تغيير المستوى المستهدف إلى {target}%", "info")
-        
-        elif command == 'toggle_ai':
-            tank_model.ai_mode = not tank_model.ai_mode
-            mode = "آلي" if tank_model.ai_mode else "يدوي"
-            data_logger.log_ai_message(f"🔄 تبديل إلى الوضع {mode}", "info")
-        
-        # إرسال التحديث
-        state = tank_model.get_state()
-        socketio.emit('tank_update', state)
-        socketio.emit('command_executed', {
-            'command': command,
+        return jsonify({
             'success': True,
-            'state': state
+            'message': 'Simulation started successfully'
         })
-        
-    except Exception as e:
-        logger.error(f"Error executing command {command}: {e}")
-        socketio.emit('command_executed', {
-            'command': command,
+    else:
+        return jsonify({
             'success': False,
-            'error': str(e)
-        })
+            'message': 'Simulation is already running'
+        }), 400
+
+@app.route('/api/simulation/stop', methods=['POST'])
+def stop_simulation():
+    """إيقاف المحاكاة"""
+    global simulation_running
+    
+    simulation_running = False
+    data_logger.log_ai_message("⏹ إيقاف محاكاة التوأم الرقمي", "system")
+    logger.info("⏹ Simulation stopped")
+    
+    return jsonify({
+        'success': True,
+        'message': 'Simulation stopped successfully'
+    })
+
+@app.route('/api/simulation/status', methods=['GET'])
+def simulation_status():
+    """حالة المحاكاة"""
+    return jsonify({
+        'success': True,
+        'data': {
+            'running': simulation_running,
+            'tank_state': tank_model.get_state(),
+            'ai_mode': tank_model.ai_mode
+        }
+    })
 
 # ==================== محاكاة الخزان ====================
 
 def tank_simulation_loop():
     """حلقة محاكاة الخزان في الوقت الحقيقي"""
-    import time
     global simulation_running
     
     logger.info("🚀 Simulation loop started")
@@ -347,57 +545,54 @@ def tank_simulation_loop():
     
     logger.info("⏹ Simulation loop stopped")
 
-@app.route('/api/simulation/start', methods=['POST'])
-def start_simulation():
-    """بدء المحاكاة"""
-    global simulation_running
-    
-    if not simulation_running:
-        simulation_running = True
-        
-        # بدء حلقة المحاكاة في thread منفصل
-        import threading
-        thread = threading.Thread(target=tank_simulation_loop, daemon=True)
-        thread.start()
-        
-        data_logger.log_ai_message("🚀 بدء محاكاة التوأم الرقمي", "system")
-        logger.info("✅ Simulation started")
-        
-        return jsonify({
-            'success': True,
-            'message': 'Simulation started successfully'
-        })
-    else:
-        return jsonify({
-            'success': False,
-            'message': 'Simulation is already running'
-        }), 400
+# ==================== WebSocket Events ====================
 
-@app.route('/api/simulation/stop', methods=['POST'])
-def stop_simulation():
-    """إيقاف المحاكاة"""
-    global simulation_running
-    
-    simulation_running = False
-    data_logger.log_ai_message("⏹ إيقاف محاكاة التوأم الرقمي", "system")
-    logger.info("⏹ Simulation stopped")
-    
-    return jsonify({
-        'success': True,
-        'message': 'Simulation stopped successfully'
+@socketio.on('connect')
+def handle_connect():
+    """عند اتصال عميل جديد"""
+    logger.info('🔌 Client connected')
+    socketio.emit('connected', {
+        'message': 'Connected to Water Tank Digital Twin',
+        'timestamp': time.time(),
+        'simulation_running': simulation_running
     })
+    
+    # إرسال الحالة الأولية
+    state = tank_model.get_state()
+    socketio.emit('tank_update', state)
 
-@app.route('/api/simulation/status', methods=['GET'])
-def simulation_status():
-    """حالة المحاكاة"""
-    return jsonify({
-        'success': True,
-        'data': {
-            'running': simulation_running,
-            'tank_state': tank_model.get_state(),
-            'ai_mode': tank_model.ai_mode
-        }
-    })
+@socketio.on('disconnect')
+def handle_disconnect():
+    """عند قطع اتصال عميل"""
+    logger.info('🔌 Client disconnected')
+
+@socketio.on('request_update')
+def handle_request_update(data):
+    """طلب تحديث البيانات"""
+    component = data.get('component', 'tank')
+    
+    try:
+        if component == 'tank':
+            state = tank_model.get_state()
+            socketio.emit('tank_update', state)
+        
+        elif component == 'alerts':
+            alerts = data_logger.get_alerts(unresolved_only=True, limit=10)
+            socketio.emit('alerts_update', alerts)
+        
+        elif component == 'ai_logs':
+            logs = ai_system.get_recent_logs(10)
+            socketio.emit('ai_logs_update', logs)
+        
+        elif component == 'all':
+            # إرسال كل البيانات
+            socketio.emit('tank_update', tank_model.get_state())
+            socketio.emit('alerts_update', data_logger.get_alerts(unresolved_only=True, limit=10))
+            socketio.emit('ai_logs_update', ai_system.get_recent_logs(10))
+            
+    except Exception as e:
+        logger.error(f"Error handling request_update: {e}")
+        socketio.emit('error', {'message': str(e)})
 
 # ==================== معالج الأخطاء ====================
 
@@ -407,7 +602,16 @@ def not_found(error):
     return jsonify({
         'success': False,
         'error': 'Endpoint not found',
-        'message': str(error)
+        'message': str(error),
+        'available_endpoints': {
+            'home': '/',
+            'tank_state': '/api/tank/state',
+            'tank_history': '/api/tank/history',
+            'control_fill': '/api/control/fill',
+            'alerts': '/api/alerts',
+            'consumption_analysis': '/api/analysis/consumption',
+            'system_stats': '/api/system/stats'
+        }
     }), 404
 
 @app.errorhandler(500)

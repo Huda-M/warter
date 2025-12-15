@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Dict, Any, List
 import logging
+import sqlite3
 from .data_logger import DataLogger
 
 logger = logging.getLogger(__name__)
@@ -103,14 +104,19 @@ class AlertSystem:
             logger.error(f"Error acknowledging alert {alert_id}: {e}")
             return False
     
-    # ❌ المشكلة: دالة clear_all_alerts() غير موجودة
     def clear_all_alerts(self):
-        conn = sqlite3.connect(self.data_logger.db_path)
-        cursor = conn.cursor()
-    
-        cursor.execute('UPDATE alerts SET resolved = TRUE')
-    
-        conn.commit()
-        conn.close()
-    
-        logger.info("All alerts cleared")
+        """حذف جميع التنبيهات"""
+        try:
+            conn = sqlite3.connect(self.data_logger.db_path)
+            cursor = conn.cursor()
+            
+            cursor.execute('UPDATE alerts SET resolved = TRUE')
+            
+            conn.commit()
+            conn.close()
+            
+            logger.info("All alerts cleared")
+            return True
+        except Exception as e:
+            logger.error(f"Error clearing all alerts: {e}")
+            return False
